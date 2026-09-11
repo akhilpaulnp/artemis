@@ -313,9 +313,10 @@ async def get_credentials():
 @router.get("/agent-cli/status")
 async def get_agent_cli_status():
     """Report optional AI agent CLI installation/login state without credentials."""
+    from artemis.llm.agent_cli import get_local_runtime_statuses
     from artemis.llm.codex_cli import get_agent_cli_statuses
 
-    return get_agent_cli_statuses()
+    return {**get_agent_cli_statuses(), **get_local_runtime_statuses()}
 
 
 @router.get("/codex/status")
@@ -400,7 +401,7 @@ async def select_model_provider(request: SelectModelProviderRequest):
 
     provider = request.provider.strip().lower()
     model = request.model.strip() or "default"
-    allowed = {"codex", "claude_cli", "pi_cli", "omp_cli", "prime_agent"}
+    allowed = {"codex", "claude_cli", "pi_cli", "omp_cli", "prime_agent", "ollama", "lmstudio"}
     if provider not in allowed:
         raise HTTPException(status_code=400, detail="Unsupported subscription provider.")
     if model != "default" and model not in get_agent_cli_models(provider):
@@ -420,9 +421,9 @@ async def select_model_provider(request: SelectModelProviderRequest):
 @router.get("/agent-cli/models")
 async def list_agent_cli_models(provider: str):
     """List selectable models for one subscription CLI provider."""
-    from artemis.llm.agent_cli import get_agent_cli_models
+    from artemis.llm.agent_cli import get_agent_cli_models, get_provider_guidance
 
-    return {"provider": provider, "models": get_agent_cli_models(provider)}
+    return {"provider": provider, "models": get_agent_cli_models(provider), **get_provider_guidance(provider)}
 
 
 @router.get("/model-config-env")
