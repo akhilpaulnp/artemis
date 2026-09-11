@@ -393,11 +393,21 @@ async def test_probe_target_serial_forwards_to_adb_probe():
 
 
 @pytest.mark.asyncio
-async def test_credentials_probe_and_dynamic_update():
+async def test_credentials_probe_and_dynamic_update(monkeypatch):
     """Verify dynamic API key updates and metadata reflection."""
+    import types
+
+    import artemis.config as artemis_config
     from artemis.config import settings
 
     settings.set_api_key("google", "test_gemini_key_1234567890", persist_to_env=False)
+    # Pin the API-key path: a subscription CLI provider is checked against its
+    # own login state instead of the configured keys.
+    monkeypatch.setattr(
+        artemis_config,
+        "get_default_llm_config",
+        lambda: types.SimpleNamespace(planner=types.SimpleNamespace(provider="google")),
+    )
 
     probe = LLMCredentialsProbe()
     result = await probe.probe()
