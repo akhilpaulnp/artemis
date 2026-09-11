@@ -359,7 +359,9 @@
         { id: 'claude_cli', name: 'Claude Code', icon: 'smart_toy', install: 'claude auth login' },
         { id: 'pi_cli', name: 'Pi', icon: 'terminal', install: 'npm install -g @earendil-works/pi-coding-agent' },
         { id: 'omp_cli', name: 'OMP', icon: 'terminal', install: 'npm install -g @oh-labs/oh-omp' },
-        { id: 'prime_agent', name: 'Prime Agent', icon: 'smart_toy', install: 'prime-agent' }
+        { id: 'prime_agent', name: 'Prime Agent', icon: 'smart_toy', install: 'prime-agent' },
+        { id: 'ollama', name: 'Ollama', icon: 'dns', install: 'ollama serve' },
+        { id: 'lmstudio', name: 'LM Studio', icon: 'dns', install: 'lms server start' }
       ]; track provider.id) {
       <div class="choice-card cli-provider-card" [class.selected]="selectedSubscriptionProvider() === provider.id"
         [class.disabled]="!agentCliStatus()[provider.id]?.installed" (click)="selectSubscriptionProvider(provider.id)">
@@ -372,7 +374,7 @@
             <div class="choice-title-row">
               <span class="choice-title">{{ provider.name }}</span>
               <span class="tag-badge" [class.tag-ready]="agentCliStatus()[provider.id]?.installed">
-                {{ agentCliStatus()[provider.id]?.authenticated ? 'Logged in' : (agentCliStatus()[provider.id]?.installed ? 'Installed' : 'Install required') }}
+                {{ agentCliStatus()[provider.id]?.authenticated ? 'Ready' : (agentCliStatus()[provider.id]?.installed ? 'Installed' : 'Install required') }}
               </span>
             </div>
             <p class="choice-desc">{{ agentCliStatus()[provider.id]?.message || provider.install }}</p>
@@ -611,10 +613,25 @@
         <select id="subscriptionModel" [ngModel]="selectedSubscriptionModel()"
           (ngModelChange)="selectSubscriptionModel($event)" [disabled]="isSelectingSubscriptionProvider()">
           @for (model of subscriptionModels(); track model) {
-          <option [value]="model">{{ model === 'default' ? 'Default (CLI decides)' : model }}</option>
+          <option [value]="model">
+            {{ model === 'default' ? 'Default (CLI decides)' : model }}{{ model === subscriptionRecommendedModel() ? ' — recommended' : '' }}
+          </option>
           }
         </select>
+        @if (subscriptionRecommendedModel() && selectedSubscriptionModel() !== subscriptionRecommendedModel()) {
+        <button type="button" class="codex-recheck" (click)="selectSubscriptionModel(subscriptionRecommendedModel()!)"
+          [disabled]="isSelectingSubscriptionProvider()">
+          <span class="material-symbols-outlined">recommend</span>
+          <span>Use {{ subscriptionRecommendedModel() }}</span>
+        </button>
+        }
       </div>
+      @if (subscriptionWarning()) {
+      <div class="codex-warning">
+        <span class="material-symbols-outlined">warning</span>
+        <span>{{ subscriptionWarning() }}</span>
+      </div>
+      }
       <p class="codex-help">Artemis now runs with <code>{{ modelConfigEnv()?.default_model?.provider || 'codex' }}</code> / <code>{{ modelConfigEnv()?.default_model?.model || 'default' }}</code>. The next task uses this provider and model.</p>
       @if (subscriptionProviderError()) {
       <div class="feedback-msg error"><span class="material-symbols-outlined">error</span><span>{{ subscriptionProviderError() }}</span></div>

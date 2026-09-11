@@ -130,6 +130,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   public selectedSubscriptionProvider = signal<string>('codex');
   public isSelectingSubscriptionProvider = signal<boolean>(false);
   public subscriptionModels = signal<string[]>([]);
+  public subscriptionRecommendedModel = signal<string | null>(null);
+  public subscriptionWarning = signal<string | null>(null);
   public selectedSubscriptionModel = signal<string>('default');
   public subscriptionProviderError = signal<string | null>(null);
   public showOcrConfig = signal<boolean>(false);
@@ -551,7 +553,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.systemService.fetchReadiness().subscribe();
     this.systemService.fetchModelConfigEnv().subscribe(config => {
       const provider = config.default_model?.provider;
-      if (provider && ['codex', 'claude_cli', 'pi_cli', 'omp_cli', 'prime_agent'].includes(provider)) {
+      if (provider && ['codex', 'claude_cli', 'pi_cli', 'omp_cli', 'prime_agent', 'ollama', 'lmstudio'].includes(provider)) {
         this.selectedSubscriptionProvider.set(provider);
         this.selectedSubscriptionModel.set(config.default_model?.model || 'default');
         this.loadSubscriptionModels(provider);
@@ -636,8 +638,16 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public loadSubscriptionModels(provider: string): void {
     this.systemService.getAgentCliModels(provider).subscribe({
-      next: response => this.subscriptionModels.set(response.models),
-      error: () => this.subscriptionModels.set(['default'])
+      next: response => {
+        this.subscriptionModels.set(response.models);
+        this.subscriptionRecommendedModel.set(response.recommended);
+        this.subscriptionWarning.set(response.warning);
+      },
+      error: () => {
+        this.subscriptionModels.set(['default']);
+        this.subscriptionRecommendedModel.set(null);
+        this.subscriptionWarning.set(null);
+      }
     });
   }
 
@@ -659,7 +669,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   public selectedSubscriptionProviderName = computed(() => ({
     codex: 'ChatGPT Codex', claude_cli: 'Claude Code', pi_cli: 'Pi',
-    omp_cli: 'OMP', prime_agent: 'Prime Agent'
+    omp_cli: 'OMP', prime_agent: 'Prime Agent',
+    ollama: 'Ollama', lmstudio: 'LM Studio'
   })[this.selectedSubscriptionProvider()] || 'AI CLI');
 
   public selectedSubscriptionStatus = computed(() =>

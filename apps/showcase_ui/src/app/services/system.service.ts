@@ -534,8 +534,8 @@ export class SystemService {
     return this.http.get<Record<string, CodexStatus>>('/api/system/agent-cli/status');
   }
 
-  public getAgentCliModels(provider: string): Observable<{ provider: string; models: string[] }> {
-    return this.http.get<{ provider: string; models: string[] }>('/api/system/agent-cli/models', { params: { provider } });
+  public getAgentCliModels(provider: string): Observable<AgentCliModels> {
+    return this.http.get<AgentCliModels>('/api/system/agent-cli/models', { params: { provider } });
   }
 
   public selectModelProvider(provider: string, model: string = 'default'): Observable<any> {
@@ -597,6 +597,13 @@ export class SystemService {
       })
     );
   }
+}
+
+export interface AgentCliModels {
+  provider: string;
+  models: string[];
+  recommended: string | null;
+  warning: string | null;
 }
 
 export interface CodexStatus {

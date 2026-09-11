@@ -1320,6 +1320,20 @@ $text-light: #94a3b8;
       }
 
       .codex-setup-box {
+        .codex-warning {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          font-size: 12px;
+          background: $amber-light;
+          color: $amber-dark;
+          border: 1px solid $amber-border;
+
+          .material-symbols-outlined { font-size: 16px; }
+        }
+
         .codex-model-row {
           display: flex;
           align-items: center;
