@@ -148,6 +148,7 @@ class LLMCredentialsProbe(BaseProbe):
             api_keys_map["ocr"] = ocr_key.get_secret_value()
 
         from artemis.config import get_default_llm_config
+        from artemis.llm.agent_cli import get_local_runtime_statuses
         from artemis.llm.codex_cli import get_agent_cli_statuses, get_codex_cli_status
 
         try:
@@ -155,7 +156,7 @@ class LLMCredentialsProbe(BaseProbe):
         except Exception:
             active_provider = None
         codex_status = get_codex_cli_status()
-        agent_cli_statuses = get_agent_cli_statuses()
+        agent_cli_statuses = {**get_agent_cli_statuses(), **get_local_runtime_statuses()}
 
         current_active_key = (
             gemini_key.get_secret_value()
@@ -182,6 +183,8 @@ class LLMCredentialsProbe(BaseProbe):
             "pi_cli": ("pi_cli", "Pi CLI"),
             "omp_cli": ("omp_cli", "OMP CLI"),
             "prime_agent": ("prime_agent", "Prime Agent"),
+            "ollama": ("ollama", "Ollama"),
+            "lmstudio": ("lmstudio", "LM Studio"),
         }
         if active_provider in subscription_providers:
             cli_id, label = subscription_providers[active_provider]

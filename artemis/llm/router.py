@@ -50,6 +50,7 @@ class ModelProvider(StrEnum):
     PI_CLI = "pi_cli"
     OMP_CLI = "omp_cli"
     PRIME_AGENT = "prime_agent"
+    LMSTUDIO = "lmstudio"
 
     @classmethod
     def from_string(cls, val: Any) -> "ModelProvider":
@@ -85,6 +86,7 @@ class ModelProvider(StrEnum):
             "picli": cls.PI_CLI,
             "ompcli": cls.OMP_CLI,
             "primeagent": cls.PRIME_AGENT,
+            "lmstudio": cls.LMSTUDIO,
         }
         provider = mapping.get(s)
         if provider is None:
@@ -395,12 +397,25 @@ class ModelFactory:
             }[provider]
             return ChatAgentCLI(model_name=endpoint.model_name, timeout_seconds=endpoint.timeout_seconds, cli_name=cli_name)
 
-        elif provider in (ModelProvider.OLLAMA, ModelProvider.VLLM, ModelProvider.CUSTOM):
+        elif provider in (
+            ModelProvider.OLLAMA,
+            ModelProvider.VLLM,
+            ModelProvider.CUSTOM,
+            ModelProvider.LMSTUDIO,
+        ):
             from langchain_openai import ChatOpenAI
 
-            api_key = endpoint.api_key or os.environ.get("OPENAI_API_KEY", "EMPTY")
-            base_url = endpoint.api_base or os.environ.get(
-                "OPENAI_BASE_URL", "http://localhost:8000/v1"
+            # Local runtimes ignore the key, but an empty string is rejected by the client.
+            api_key = endpoint.api_key or os.environ.get("OPENAI_API_KEY") or "EMPTY"
+            # Local runtimes listen on their own documented ports.
+            local_defaults = {
+                ModelProvider.OLLAMA: "http://localhost:11434/v1",
+                ModelProvider.LMSTUDIO: "http://localhost:1234/v1",
+            }
+            base_url = (
+                endpoint.api_base
+                or local_defaults.get(provider)
+                or os.environ.get("OPENAI_BASE_URL", "http://localhost:8000/v1")
             )
             kwargs = {
                 "model": endpoint.model_name,

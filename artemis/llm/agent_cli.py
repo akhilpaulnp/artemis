@@ -76,6 +76,9 @@ _CLI_MODEL_SOURCES = {"codex": "openai-codex", "claude_cli": "anthropic"}
 
 def get_agent_cli_models(provider: str) -> list[str]:
     """List selectable models for a subscription CLI, newest catalog first."""
+    if provider in _LOCAL_RUNTIMES:
+        return ["default", *(_local_runtime_models(_LOCAL_RUNTIMES[provider][0]) or [])]
+
     models: list[str] = []
     if shutil.which("prime-agent"):
         try:
@@ -100,3 +103,101 @@ def get_agent_cli_models(provider: str) -> list[str]:
     if not models:
         models = list(_STATIC_MODELS.get(provider, []))
     return ["default", *dict.fromkeys(models)]
+
+
+_LOCAL_RUNTIMES = {
+    "ollama": ("http://127.0.0.1:11434/v1/models", "Ollama", "ollama serve"),
+    "lmstudio": ("http://127.0.0.1:1234/v1/models", "LM Studio", "lms server start"),
+}
+
+
+def _local_runtime_models(url: str) -> list[str] | None:
+    """Return model ids from an OpenAI-compatible local server, or None if it is down."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=3) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError):
+        return None
+    return [entry["id"] for entry in payload.get("data", []) if entry.get("id")]
+
+
+def get_local_runtime_statuses() -> dict[str, dict[str, str | bool]]:
+    """Report whether local model runtimes are installed and serving."""
+    commands = {"ollama": "ollama", "lmstudio": "lms"}
+    statuses: dict[str, dict[str, str | bool]] = {}
+    for provider, (url, label, start_hint) in _LOCAL_RUNTIMES.items():
+        installed = shutil.which(commands[provider]) is not None
+        models = _local_runtime_models(url) if installed else None
+        if not installed:
+            message = f"{label} is not installed."
+        elif models is None:
+            message = f"{label} is installed but not serving. Run `{start_hint}`."
+        elif not models:
+            message = f"{label} is running but has no models. Download one first."
+        else:
+            message = f"{label} is running with {len(models)} model(s)."
+        statuses[provider] = {
+            "installed": installed,
+            "authenticated": bool(models),
+            "message": message,
+        }
+    return statuses
+
+
+_PROVIDER_GUIDANCE: dict[str, dict[str, str | None]] = {
+    "codex": {"recommended": "gpt-5.5", "warning": None},
+    "claude_cli": {"recommended": "sonnet", "warning": "Every Artemis step uses your Claude subscription quota."},
+    "pi_cli": {
+        "recommended": None,
+        "warning": "Experimental: the Pi CLI has no structured-output flag, so tool calls can fail.",
+    },
+    "omp_cli": {
+        "recommended": None,
+        "warning": "Experimental: the OMP CLI has no structured-output flag, so tool calls can fail.",
+    },
+    "prime_agent": {
+        "recommended": None,
+        "warning": "Experimental: Prime Agent JSON mode is not schema-guaranteed, so tool calls can fail.",
+    },
+    "ollama": {
+        "recommended": None,
+        "warning": "Local models are weak at pixel grounding. Use a vision model, prefer Pro profile, and expect lower accuracy.",
+    },
+    "lmstudio": {
+        "recommended": None,
+        "warning": "Local models are weak at pixel grounding. Load a vision model and expect lower accuracy.",
+    },
+}
+
+
+def _recommended_ollama_model() -> str | None:
+    """Prefer an installed Ollama model that can see screenshots and call tools."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError):
+        return None
+    for entry in payload.get("models", []):
+        capabilities = set(entry.get("capabilities") or [])
+        if {"vision", "tools"} <= capabilities:
+            return entry.get("name")
+    return None
+
+
+def get_provider_guidance(provider: str) -> dict[str, str | None]:
+    """Return the recommended model and usage warning for one provider."""
+    guidance = dict(_PROVIDER_GUIDANCE.get(provider, {"recommended": None, "warning": None}))
+    if provider == "ollama":
+        guidance["recommended"] = _recommended_ollama_model()
+    available = get_agent_cli_models(provider)
+    recommended = guidance["recommended"]
+    if recommended and recommended not in available:
+        # CLI aliases such as "sonnet" resolve to a full catalog entry.
+        guidance["recommended"] = next((m for m in available if recommended in m), None)
+    return guidance
