@@ -147,6 +147,16 @@ class LLMCredentialsProbe(BaseProbe):
         if ocr_key and not is_placeholder_key(ocr_key):
             api_keys_map["ocr"] = ocr_key.get_secret_value()
 
+        from artemis.config import get_default_llm_config
+        from artemis.llm.codex_cli import get_agent_cli_statuses, get_codex_cli_status
+
+        try:
+            active_provider = get_default_llm_config().planner.provider
+        except Exception:
+            active_provider = None
+        codex_status = get_codex_cli_status()
+        agent_cli_statuses = get_agent_cli_statuses()
+
         current_active_key = (
             gemini_key.get_secret_value()
             if gemini_key
@@ -160,7 +170,45 @@ class LLMCredentialsProbe(BaseProbe):
             "current_key": current_active_key,
             "current_gemini_key": gemini_key.get_secret_value() if gemini_key else "",
             "api_keys": api_keys_map,
+            "active_provider": active_provider,
+            "codex": codex_status,
+            "agent_clis": agent_cli_statuses,
         }
+
+        # Subscription CLIs authenticate outside Artemis, rather than with an API key.
+        subscription_providers = {
+            "codex": ("codex", "ChatGPT subscription"),
+            "claude_cli": ("claude_cli", "Claude Code subscription"),
+            "pi_cli": ("pi_cli", "Pi CLI"),
+            "omp_cli": ("omp_cli", "OMP CLI"),
+            "prime_agent": ("prime_agent", "Prime Agent"),
+        }
+        if active_provider in subscription_providers:
+            cli_id, label = subscription_providers[active_provider]
+            status = agent_cli_statuses[cli_id]
+            if status["authenticated"] or (cli_id == "prime_agent" and status["installed"]):
+                return ProbeResult(
+                    id=self.probe_id,
+                    category=self.category,
+                    title="AI Model Authentication",
+                    status=ProbeStatus.PASS,
+                    is_blocker=self.is_blocker,
+                    summary=f"Active ({label})",
+                    description=f"{label} is ready for Artemis.",
+                    metadata=metadata,
+                    actions=[ProbeAction(action_type="hint", label=f"{label} active", payload=str(status["message"]))],
+                )
+            return ProbeResult(
+                id=self.probe_id,
+                category=self.category,
+                title="AI Model Authentication",
+                status=ProbeStatus.FAIL,
+                is_blocker=self.is_blocker,
+                summary=f"{label} unavailable",
+                description=str(status["message"]),
+                metadata=metadata,
+                actions=[ProbeAction(action_type="command", label="Install or log in", payload=cli_id)],
+            )
 
         # Case 1: Gemini API Key configured (Standard / Recommended)
         if gemini_key:

@@ -121,8 +121,17 @@ export class HomeComponent implements OnInit, OnDestroy {
   public activeAdbGuideTab = signal<AdbGuideTab>('emulator');
   public emulatorSetupMode = signal<'studio' | 'cli'>('studio');
 
-  // Interactive guide tab for LLM / OCR credentials: 'gemini' | 'ocr'
-  public modelSetupMode = signal<'gemini' | 'custom'>('gemini');
+  // Interactive guide tab for LLM / OCR credentials.
+  public modelSetupMode = signal<'gemini' | 'codex' | 'custom'>('gemini');
+  public isCheckingCodex = signal<boolean>(false);
+  public codexStatus = signal<{ installed: boolean; authenticated: boolean; message: string } | null>(null);
+  public codexStatusError = signal<string | null>(null);
+  public agentCliStatus = signal<Record<string, { installed: boolean; authenticated: boolean; message: string }>>({});
+  public selectedSubscriptionProvider = signal<string>('codex');
+  public isSelectingSubscriptionProvider = signal<boolean>(false);
+  public subscriptionModels = signal<string[]>([]);
+  public selectedSubscriptionModel = signal<string>('default');
+  public subscriptionProviderError = signal<string | null>(null);
   public showOcrConfig = signal<boolean>(false);
   public showFullConfigFile = signal<boolean>(false);
 
@@ -540,7 +549,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.loadProTuningDefaults();
     // Initial fetch of system readiness & model configuration
     this.systemService.fetchReadiness().subscribe();
-    this.systemService.fetchModelConfigEnv().subscribe();
+    this.systemService.fetchModelConfigEnv().subscribe(config => {
+      const provider = config.default_model?.provider;
+      if (provider && ['codex', 'claude_cli', 'pi_cli', 'omp_cli', 'prime_agent'].includes(provider)) {
+        this.selectedSubscriptionProvider.set(provider);
+        this.selectedSubscriptionModel.set(config.default_model?.model || 'default');
+        this.loadSubscriptionModels(provider);
+        this.modelSetupMode.set('codex');
+      }
+    });
+    this.refreshCodexStatus();
+    this.refreshAgentCliStatus();
     this.systemService.fetchAdbServerStatus().subscribe({
       next: status => {
         if (status.endpoint.mode === 'remote') {
@@ -581,14 +600,86 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.emulatorSetupMode.set(mode);
   }
 
-  public setModelSetupMode(mode: 'gemini' | 'custom'): void {
+  public setModelSetupMode(mode: 'gemini' | 'codex' | 'custom'): void {
     this.modelSetupMode.set(mode);
+    this.systemService.setSkipCredentialsCheck(mode === 'custom');
     if (mode === 'custom') {
-      this.systemService.setSkipCredentialsCheck(true);
       this.systemService.fetchModelConfigEnv().subscribe();
-    } else {
-      this.systemService.setSkipCredentialsCheck(false);
     }
+    if (mode === 'codex') {
+      this.refreshCodexStatus();
+    }
+  }
+
+  public refreshAgentCliStatus(): void {
+    this.systemService.getAgentCliStatus().subscribe({ next: status => this.agentCliStatus.set(status) });
+  }
+
+  public selectSubscriptionProvider(provider: string): void {
+    if (!this.agentCliStatus()[provider]?.installed || this.isSelectingSubscriptionProvider()) return;
+    this.isSelectingSubscriptionProvider.set(true);
+    this.subscriptionProviderError.set(null);
+    this.systemService.selectModelProvider(provider, 'default').subscribe({
+      next: () => {
+        this.selectedSubscriptionProvider.set(provider);
+        this.selectedSubscriptionModel.set('default');
+        this.loadSubscriptionModels(provider);
+        this.setModelSetupMode('codex');
+        this.isSelectingSubscriptionProvider.set(false);
+      },
+      error: err => {
+        this.subscriptionProviderError.set(err?.error?.detail || err?.message || 'Could not select provider.');
+        this.isSelectingSubscriptionProvider.set(false);
+      }
+    });
+  }
+
+  public loadSubscriptionModels(provider: string): void {
+    this.systemService.getAgentCliModels(provider).subscribe({
+      next: response => this.subscriptionModels.set(response.models),
+      error: () => this.subscriptionModels.set(['default'])
+    });
+  }
+
+  public selectSubscriptionModel(model: string): void {
+    if (this.isSelectingSubscriptionProvider()) return;
+    this.isSelectingSubscriptionProvider.set(true);
+    this.subscriptionProviderError.set(null);
+    this.systemService.selectModelProvider(this.selectedSubscriptionProvider(), model).subscribe({
+      next: () => {
+        this.selectedSubscriptionModel.set(model);
+        this.isSelectingSubscriptionProvider.set(false);
+      },
+      error: err => {
+        this.subscriptionProviderError.set(err?.error?.detail || err?.message || 'Could not select model.');
+        this.isSelectingSubscriptionProvider.set(false);
+      }
+    });
+  }
+
+  public selectedSubscriptionProviderName = computed(() => ({
+    codex: 'ChatGPT Codex', claude_cli: 'Claude Code', pi_cli: 'Pi',
+    omp_cli: 'OMP', prime_agent: 'Prime Agent'
+  })[this.selectedSubscriptionProvider()] || 'AI CLI');
+
+  public selectedSubscriptionStatus = computed(() =>
+    this.agentCliStatus()[this.selectedSubscriptionProvider()] || null
+  );
+
+  public refreshCodexStatus(): void {
+    this.isCheckingCodex.set(true);
+    this.codexStatusError.set(null);
+    this.systemService.getCodexStatus().subscribe({
+      next: status => {
+        this.codexStatus.set(status);
+        this.isCheckingCodex.set(false);
+        this.systemService.fetchReadiness().subscribe();
+      },
+      error: err => {
+        this.codexStatusError.set(err?.error?.detail || err?.message || 'Could not check Codex CLI status.');
+        this.isCheckingCodex.set(false);
+      }
+    });
   }
 
   public toggleFullConfigFile(): void {

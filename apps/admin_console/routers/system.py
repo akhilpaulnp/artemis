@@ -16,6 +16,7 @@
 
 import ipaddress
 import os
+import re
 import secrets
 from urllib.parse import urlsplit
 
@@ -273,6 +274,11 @@ class UpdateCredentialsRequest(BaseModel):
     )
 
 
+class SelectModelProviderRequest(BaseModel):
+    provider: str = Field(description="Configured Artemis model provider")
+    model: str = Field(default="default", description="Model for the selected provider")
+
+
 class ValidateCredentialsRequest(BaseModel):
     """Payload to test and verify LLM or Vision OCR API credentials without saving."""
 
@@ -302,6 +308,22 @@ async def get_credentials():
             {"name": name, "configured": configured} for name, configured in status.items()
         ]
     }
+
+
+@router.get("/agent-cli/status")
+async def get_agent_cli_status():
+    """Report optional AI agent CLI installation/login state without credentials."""
+    from artemis.llm.codex_cli import get_agent_cli_statuses
+
+    return get_agent_cli_statuses()
+
+
+@router.get("/codex/status")
+async def get_codex_status():
+    """Report Codex CLI installation and ChatGPT login status without exposing credentials."""
+    from artemis.llm.codex_cli import get_codex_cli_status
+
+    return get_codex_cli_status()
 
 
 @router.post("/credentials/test")
@@ -368,6 +390,39 @@ async def update_credentials(request: UpdateCredentialsRequest):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to update credentials: {exc}")
+
+
+@router.post("/model-provider")
+async def select_model_provider(request: SelectModelProviderRequest):
+    """Persist the selected subscription CLI as Artemis's default provider."""
+    from artemis.config.paths import get_config_path
+    from artemis.llm.agent_cli import get_agent_cli_models
+
+    provider = request.provider.strip().lower()
+    model = request.model.strip() or "default"
+    allowed = {"codex", "claude_cli", "pi_cli", "omp_cli", "prime_agent"}
+    if provider not in allowed:
+        raise HTTPException(status_code=400, detail="Unsupported subscription provider.")
+    if model != "default" and model not in get_agent_cli_models(provider):
+        raise HTTPException(status_code=400, detail="Unsupported model for this provider.")
+    path = get_config_path("artemis.jsonc")
+    content = path.read_text(encoding="utf-8")
+    start, separator, remainder = content.partition('"presets"')
+    updated, provider_count = re.subn(r'("provider"\s*:\s*")[^"]+("\s*,)', rf'\g<1>{provider}\g<2>', start, count=2)
+    updated, model_count = re.subn(r'("model"\s*:\s*")[^"]+("\s*,)', rf'\g<1>{model}\g<2>', updated, count=2)
+    if provider_count != 2 or model_count != 2:
+        raise HTTPException(status_code=500, detail="Could not update default provider configuration.")
+    path.write_text(updated + separator + remainder, encoding="utf-8")
+    readiness_engine.invalidate_cache()
+    return {"provider": provider, "model": model, "report": await readiness_engine.run_all(force_refresh=True)}
+
+
+@router.get("/agent-cli/models")
+async def list_agent_cli_models(provider: str):
+    """List selectable models for one subscription CLI provider."""
+    from artemis.llm.agent_cli import get_agent_cli_models
+
+    return {"provider": provider, "models": get_agent_cli_models(provider)}
 
 
 @router.get("/model-config-env")

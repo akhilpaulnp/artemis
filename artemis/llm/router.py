@@ -45,6 +45,11 @@ class ModelProvider(StrEnum):
     OLLAMA = "ollama"
     VLLM = "vllm"
     CUSTOM = "custom"
+    CODEX = "codex"
+    CLAUDE_CLI = "claude_cli"
+    PI_CLI = "pi_cli"
+    OMP_CLI = "omp_cli"
+    PRIME_AGENT = "prime_agent"
 
     @classmethod
     def from_string(cls, val: Any) -> "ModelProvider":
@@ -75,6 +80,11 @@ class ModelProvider(StrEnum):
             "ollama": cls.OLLAMA,
             "vllm": cls.VLLM,
             "custom": cls.CUSTOM,
+            "codex": cls.CODEX,
+            "claudecli": cls.CLAUDE_CLI,
+            "picli": cls.PI_CLI,
+            "ompcli": cls.OMP_CLI,
+            "primeagent": cls.PRIME_AGENT,
         }
         provider = mapping.get(s)
         if provider is None:
@@ -365,6 +375,25 @@ class ModelFactory:
                 base_url=endpoint.api_base or "https://api.x.ai/v1",
                 timeout=endpoint.timeout_seconds,
             )
+
+        elif provider == ModelProvider.CODEX:
+            from artemis.llm.codex_cli import ChatCodexCLI
+
+            return ChatCodexCLI(
+                model_name=endpoint.model_name,
+                timeout_seconds=endpoint.timeout_seconds,
+            )
+
+        elif provider in (ModelProvider.CLAUDE_CLI, ModelProvider.PI_CLI, ModelProvider.OMP_CLI, ModelProvider.PRIME_AGENT):
+            from artemis.llm.agent_cli import ChatAgentCLI
+
+            cli_name = {
+                ModelProvider.CLAUDE_CLI: "claude",
+                ModelProvider.PI_CLI: "pi",
+                ModelProvider.OMP_CLI: "omp",
+                ModelProvider.PRIME_AGENT: "prime-agent",
+            }[provider]
+            return ChatAgentCLI(model_name=endpoint.model_name, timeout_seconds=endpoint.timeout_seconds, cli_name=cli_name)
 
         elif provider in (ModelProvider.OLLAMA, ModelProvider.VLLM, ModelProvider.CUSTOM):
             from langchain_openai import ChatOpenAI

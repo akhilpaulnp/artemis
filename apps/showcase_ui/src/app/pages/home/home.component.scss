@@ -1034,7 +1034,12 @@ $text-light: #94a3b8;
             }
           }
 
-          &:hover:not(.selected) {
+          &.disabled {
+            cursor: not-allowed;
+            opacity: 0.58;
+          }
+
+          &:hover:not(.selected):not(.disabled) {
             border-color: $card-border-hover;
             background: #ffffff;
           }
@@ -1310,6 +1315,73 @@ $text-light: #94a3b8;
             background: $rose-light;
             color: $rose-dark;
             border: 1px solid $rose-border;
+          }
+        }
+      }
+
+      .codex-setup-box {
+        .codex-model-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          color: $text-secondary;
+
+          select {
+            font: inherit;
+            padding: 6px 10px;
+            border-radius: 7px;
+            border: 1px solid $card-border;
+            background: #ffffff;
+            color: $text-main;
+            min-width: 220px;
+          }
+        }
+
+        .codex-recheck {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 32px;
+          padding: 0 12px;
+          border: 1px solid $primary-border;
+          border-radius: 7px;
+          background: #ffffff;
+          color: $primary;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+
+          .material-symbols-outlined { font-size: 16px; }
+          &:hover:not(:disabled) { background: $primary-light; }
+          &:disabled { cursor: default; opacity: 0.6; }
+        }
+
+        .codex-status {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          font-size: 12px;
+          background: $rose-light;
+          color: $rose-dark;
+
+          &.ready {
+            background: $emerald-light;
+            color: $emerald;
+          }
+        }
+
+        .codex-help {
+          margin: 0;
+          color: $text-secondary;
+          font-size: 12px;
+
+          code {
+            font-family: $font-mono;
+            color: $primary-dark;
           }
         }
       }

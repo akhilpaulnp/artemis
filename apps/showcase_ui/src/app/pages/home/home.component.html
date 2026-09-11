@@ -298,7 +298,7 @@
       <div class="step-title-row">
         <h3 class="step-title">AI Model Setup</h3>
       </div>
-      <p class="step-desc">Google Gemini or custom LLM providers (OpenAI, Claude, Ollama)</p>
+      <p class="step-desc">ChatGPT Codex subscription, Google Gemini, or custom LLM providers</p>
     </div>
   </div>
 
@@ -335,7 +335,53 @@
         </div>
       </div>
 
-      <!-- Card 2: Custom Configuration -->
+      <!-- Card 2: Codex Subscription -->
+      <div class="choice-card" [class.selected]="selectedSubscriptionProvider() === 'codex'" (click)="selectSubscriptionProvider('codex')">
+        <div class="choice-card-top">
+          <div class="choice-radio">
+            <span class="radio-dot" [class.checked]="selectedSubscriptionProvider() === 'codex'"></span>
+          </div>
+          <div class="choice-icon-wrap icon-gear">
+            <span class="material-symbols-outlined">terminal</span>
+          </div>
+          <div class="choice-text">
+            <div class="choice-title-row">
+              <span class="choice-title">ChatGPT Codex</span>
+              <span class="tag-badge tag-ready">Subscription</span>
+            </div>
+            <p class="choice-desc">Use your logged-in Codex CLI. No API key needed.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional CLI Providers -->
+      @for (provider of [
+        { id: 'claude_cli', name: 'Claude Code', icon: 'smart_toy', install: 'claude auth login' },
+        { id: 'pi_cli', name: 'Pi', icon: 'terminal', install: 'npm install -g @earendil-works/pi-coding-agent' },
+        { id: 'omp_cli', name: 'OMP', icon: 'terminal', install: 'npm install -g @oh-labs/oh-omp' },
+        { id: 'prime_agent', name: 'Prime Agent', icon: 'smart_toy', install: 'prime-agent' }
+      ]; track provider.id) {
+      <div class="choice-card cli-provider-card" [class.selected]="selectedSubscriptionProvider() === provider.id"
+        [class.disabled]="!agentCliStatus()[provider.id]?.installed" (click)="selectSubscriptionProvider(provider.id)">
+        <div class="choice-card-top">
+          <div class="choice-radio">
+            <span class="radio-dot" [class.checked]="selectedSubscriptionProvider() === provider.id"></span>
+          </div>
+          <div class="choice-icon-wrap icon-gear"><span class="material-symbols-outlined">{{ provider.icon }}</span></div>
+          <div class="choice-text">
+            <div class="choice-title-row">
+              <span class="choice-title">{{ provider.name }}</span>
+              <span class="tag-badge" [class.tag-ready]="agentCliStatus()[provider.id]?.installed">
+                {{ agentCliStatus()[provider.id]?.authenticated ? 'Logged in' : (agentCliStatus()[provider.id]?.installed ? 'Installed' : 'Install required') }}
+              </span>
+            </div>
+            <p class="choice-desc">{{ agentCliStatus()[provider.id]?.message || provider.install }}</p>
+          </div>
+        </div>
+      </div>
+      }
+
+      <!-- Card 3: Custom Configuration -->
       <div class="choice-card" [class.selected]="modelSetupMode() === 'custom'" (click)="setModelSetupMode('custom')">
         <div class="choice-card-top">
           <div class="choice-radio">
@@ -537,6 +583,41 @@
           }
         </div>
       </div>
+      }
+    </div>
+    } @else if (modelSetupMode() === 'codex') {
+    <div class="credentials-input-box codex-setup-box">
+      <div class="input-box-header">
+        <div class="header-label">
+          <span class="material-symbols-outlined label-icon">terminal</span>
+          <span>{{ selectedSubscriptionProviderName() }} setup</span>
+        </div>
+        <button type="button" class="codex-recheck" (click)="refreshAgentCliStatus()">
+          <span class="material-symbols-outlined">sync</span>
+          <span>Re-check {{ selectedSubscriptionProviderName() }}</span>
+        </button>
+      </div>
+      @if (codexStatus()) {
+      <div class="codex-status" [class.ready]="selectedSubscriptionStatus()!.authenticated" [class.error]="!selectedSubscriptionStatus()!.authenticated">
+        <span class="material-symbols-outlined">{{ selectedSubscriptionStatus()!.authenticated ? 'check_circle' : 'error' }}</span>
+        <span>{{ selectedSubscriptionStatus()!.message }}</span>
+      </div>
+      }
+      @if (codexStatusError()) {
+      <div class="feedback-msg error"><span class="material-symbols-outlined">error</span><span>{{ codexStatusError() }}</span></div>
+      }
+      <div class="codex-model-row">
+        <label for="subscriptionModel">Model:</label>
+        <select id="subscriptionModel" [ngModel]="selectedSubscriptionModel()"
+          (ngModelChange)="selectSubscriptionModel($event)" [disabled]="isSelectingSubscriptionProvider()">
+          @for (model of subscriptionModels(); track model) {
+          <option [value]="model">{{ model === 'default' ? 'Default (CLI decides)' : model }}</option>
+          }
+        </select>
+      </div>
+      <p class="codex-help">Artemis now runs with <code>{{ modelConfigEnv()?.default_model?.provider || 'codex' }}</code> / <code>{{ modelConfigEnv()?.default_model?.model || 'default' }}</code>. The next task uses this provider and model.</p>
+      @if (subscriptionProviderError()) {
+      <div class="feedback-msg error"><span class="material-symbols-outlined">error</span><span>{{ subscriptionProviderError() }}</span></div>
       }
     </div>
     } @else {

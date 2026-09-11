@@ -152,7 +152,7 @@ def test_llm_config_parsing_and_merging():
     """Test LLMConfig parsing, agent querying, and deep merging."""
     llm_cfg = get_default_llm_config()
     assert isinstance(llm_cfg, LLMConfig)
-    assert llm_cfg.planner.provider in ("google", "openai", "openrouter", "xai", "vertexai")
+    assert llm_cfg.planner.provider in ("google", "openai", "openrouter", "xai", "vertexai", "ollama", "codex")
     assert llm_cfg.get_agent("planner") is not None
     assert llm_cfg.get_utils("hopper") is not None
 
@@ -176,8 +176,8 @@ def test_agent_config_loading():
     # ships unset so each tier applies its own default (off pro, on ultra).
     assert agent_cfg.explorer_versions == {}
     assert agent_cfg.explorer.default_version == "flash"
-    assert agent_cfg.explorer.flash_mode == "flash"
-    assert agent_cfg.explorer.pro_mode == "flash"
+    assert agent_cfg.explorer.flash_mode == "pro"
+    assert agent_cfg.explorer.pro_mode == "pro"
     assert agent_cfg.explorer.caching is None
     assert "explorer" in agent_cfg.denylisted_tools
     assert agent_cfg.video_analyzer.enable_ledger is True
@@ -192,9 +192,9 @@ def test_agent_config_loading():
     assert agent_cfg.checker.device_probes is True
     assert agent_cfg.outputter.enabled is True
     assert agent_cfg.outputter.force_synthesis is False
-    assert agent_cfg.flash.max_turns == 0
-    assert agent_cfg.flash.explorer_mode == "flash"
-    assert agent_cfg.pro.explorer.mode == "flash"
+    assert agent_cfg.flash.max_turns == 20
+    assert agent_cfg.flash.explorer_mode == "pro"
+    assert agent_cfg.pro.explorer.mode == "pro"
     assert agent_cfg.pro.checker.enabled is True
     assert agent_cfg.pro.committee.enabled is False
     assert agent_cfg.pro.planner_validation.enabled is True
@@ -456,8 +456,8 @@ def test_explorer_builder_and_resolution(monkeypatch):
     builder = AgentConfigBuilder()
     cfg = builder.build()
     assert cfg.explorer.default_version == "flash"
-    assert cfg.explorer.flash_mode == "flash"
-    assert cfg.explorer.pro_mode == "flash"
+    assert cfg.explorer.flash_mode == "pro"
+    assert cfg.explorer.pro_mode == "pro"
     assert cfg.explorer.caching is None
     assert cfg.explorer_versions == {}
 
@@ -466,10 +466,10 @@ def test_explorer_builder_and_resolution(monkeypatch):
     cfg_pro_ultra = AgentConfigBuilder().with_explorer(pro_mode="ultra").build()
     assert cfg_pro_ultra.get_explorer_version(agent_name="operator") == "ultra"
     assert cfg_pro_ultra.get_explorer_version(agent_name="validator") == "ultra"
-    assert cfg_pro_ultra.get_explorer_version(agent_name="flash") == "flash"
+    assert cfg_pro_ultra.get_explorer_version(agent_name="flash") == "pro"
     cfg_flash_pro = AgentConfigBuilder().with_explorer(flash_mode="pro").build()
     assert cfg_flash_pro.get_explorer_version(agent_name="flash") == "pro"
-    assert cfg_flash_pro.get_explorer_version(agent_name="operator") == "flash"
+    assert cfg_flash_pro.get_explorer_version(agent_name="operator") == "pro"
 
     # Fluent configuration with with_explorer
     cfg_custom = (

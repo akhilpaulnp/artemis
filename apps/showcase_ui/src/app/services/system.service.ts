@@ -526,6 +526,27 @@ export class SystemService {
 
   public modelConfigEnv = signal<ModelConfigEnvResponse | null>(null);
 
+  public getCodexStatus(): Observable<CodexStatus> {
+    return this.http.get<CodexStatus>('/api/system/codex/status');
+  }
+
+  public getAgentCliStatus(): Observable<Record<string, CodexStatus>> {
+    return this.http.get<Record<string, CodexStatus>>('/api/system/agent-cli/status');
+  }
+
+  public getAgentCliModels(provider: string): Observable<{ provider: string; models: string[] }> {
+    return this.http.get<{ provider: string; models: string[] }>('/api/system/agent-cli/models', { params: { provider } });
+  }
+
+  public selectModelProvider(provider: string, model: string = 'default'): Observable<any> {
+    return this.http.post<any>('/api/system/model-provider', { provider, model }).pipe(
+      tap(response => {
+        if (response?.report) this.applyReadinessReport(response.report);
+        this.fetchModelConfigEnv().subscribe();
+      })
+    );
+  }
+
   /**
    * Fetch current model configuration (artemis.jsonc) and environment (.env) status
    */
@@ -576,6 +597,12 @@ export class SystemService {
       })
     );
   }
+}
+
+export interface CodexStatus {
+  installed: boolean;
+  authenticated: boolean;
+  message: string;
 }
 
 export interface ModelConfigEnvResponse {
