@@ -7,13 +7,13 @@
   // 1. Global Default Model (Applied to all sub-agents unless overridden below)
   // ------------------------------------------------------------------------------
   "default": {
-    "provider": "claude_cli",
-    "model": "default",
+    "provider": "ollama",
+    "model": "qwen3-vl:4b",
     "thinking_level": "medium",
     "reasoning_effort": "medium",
     "fallback": {
-      "provider": "claude_cli",
-      "model": "default",
+      "provider": "ollama",
+      "model": "qwen3-vl:4b",
       "thinking_level": "medium",
       "reasoning_effort": "medium"
     }
